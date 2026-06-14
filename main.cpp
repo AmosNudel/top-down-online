@@ -371,7 +371,7 @@ static void CollectLocalInput(PlayerInput &input
 int main(int argc, char **argv)
 {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(960, 960, "Amos's Top Down");
+    InitWindow(960, 960, "Top Down Survive Online");
     SetWindowMinSize(gameWidth, gameHeight);
     ChangeDirectory(GetApplicationDirectory());
 
@@ -412,9 +412,28 @@ int main(int argc, char **argv)
     double onlineCountdownEndTime = 0.0;
     bool onlineCountdownActive = false;
     bool joinedServerSession = false;
+    bool connectPending = false;
+    double connectAttemptStartTime = 0.0;
+    constexpr double kJoinResponseTimeoutSec = 12.0;
+
+    auto cancelPendingConnect = [&](const char *message)
+    {
+        connectPending = false;
+        joinedServerSession = false;
+        if (message && message[0])
+            statusMessage = message;
+        if (netClient.isConnected())
+            netClient.disconnect();
+    };
 
     auto handleNetDisconnect = [&]()
     {
+        if (connectPending)
+        {
+            cancelPendingConnect("Server disconnected before join completed.");
+            return;
+        }
+
         if (!joinedServerSession)
             return;
 
@@ -438,6 +457,7 @@ int main(int argc, char **argv)
             {
                 NetSJoinOk pkt{};
                 std::memcpy(&pkt, data, sizeof(pkt));
+                connectPending = false;
                 joinedServerSession = true;
                 netClient.setAssignedPlayerId(pkt.playerId);
                 sim.resetWorldStateSync();
@@ -454,6 +474,7 @@ int main(int argc, char **argv)
                 NetSJoinFail pkt{};
                 std::memcpy(&pkt, data, sizeof(pkt));
                 ClientNetLog("S_JOIN_FAIL reason=%u", pkt.reason);
+                connectPending = false;
                 joinedServerSession = false;
                 if (pkt.reason == NET_JOIN_SERVER_FULL)
                     statusMessage = "Server is full (10/10). Try again later.";
@@ -678,8 +699,15 @@ int main(int argc, char **argv)
         // ---- Title screen ----
         if (state == GameState::TITLE)
         {
+            if (connectPending && !joinedServerSession &&
+                GetTime() - connectAttemptStartTime > kJoinResponseTimeoutSec)
+            {
+                cancelPendingConnect(
+                    "Server did not respond. Railway may be down — check deploy logs.");
+            }
+
             ClearBackground(DARKGREEN);
-            DrawCenteredText("Top Down Survive", gameWidth, gameHeight / 2 - 120, 48, RAYWHITE);
+            DrawCenteredText("Top Down Survive Online", gameWidth, gameHeight / 2 - 120, 48, RAYWHITE);
             DrawCenteredText("Enter your name", gameWidth, gameHeight / 2 - 55, 20, LIGHTGRAY);
 
 #if defined(PLATFORM_WEB)
@@ -738,9 +766,7 @@ int main(int argc, char **argv)
                     else if (!netClient.sendJoin(playerName.c_str()))
                     {
                         ClientNetLog("sendJoin failed");
-                        statusMessage = "Failed to send join request.";
-                        joinedServerSession = false;
-                        netClient.disconnect();
+                        cancelPendingConnect("Failed to send join request.");
                     }
                     else
                     {
@@ -752,6 +778,8 @@ int main(int argc, char **argv)
                                      serverHost.c_str(), serverPort, playerName.c_str());
 #endif
                         joinedServerSession = false;
+                        connectPending = true;
+                        connectAttemptStartTime = GetTime();
                         statusMessage = "Connecting...";
                     }
                 }

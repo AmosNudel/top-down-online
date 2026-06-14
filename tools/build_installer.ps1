@@ -31,7 +31,7 @@ Write-Host "Building installer..."
 & $iscc $iss
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$setup = Join-Path $root "installer\TopDownSurvive_Setup.exe"
+$setup = Join-Path $root "installer\top-down-survive-online_Setup.exe"
 Write-Host ""
 Write-Host "Done! Share this file with others:"
 Write-Host "  $setup"

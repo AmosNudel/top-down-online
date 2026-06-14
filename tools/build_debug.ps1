@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot/build_common.ps1"
 
 $root = Split-Path -Parent $PSScriptRoot
-$exeName = "TopDownSurvive"
+$exeName = "TopDownSurviveOnline"
 
 Push-Location $root
 
@@ -20,6 +20,6 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
 Write-Host "Done! Terminal 1: .\tools\build_server.ps1 then dist-server\TopDownSurviveServer.exe"
-Write-Host "       Terminal 2: .\TopDownSurvive.exe"
+Write-Host "       Terminal 2: .\TopDownSurviveOnline.exe"
 
 Pop-Location

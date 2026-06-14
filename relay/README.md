@@ -35,20 +35,45 @@ Or WebSocket web build:
 
 ## Railway
 
-1. Build Linux server binary + Docker image (see `Dockerfile`).
-2. Deploy service; Railway sets `PORT` for the relay.
-3. Set `GAME_TCP_PORT=27016` (default).
-4. Point web clients at `wss://<your-service>.up.railway.app/game`.
-5. Optional: enable **TCP Proxy** on port `27016` for native desktop clients using `--transport tcp`.
+Railway adds **`RAILWAY_TCP_APPLICATION_PORT=27016`** when you enable TCP Proxy — **leave it**, you cannot (and should not) delete it. That tells the C++ game server which port to accept desktop TCP connections on.
 
-## Environment
+You run **two listeners** in one container:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `PORT` | `8080` | Public HTTP/WebSocket port (Railway provides this) |
-| `GAME_TCP_HOST` | `127.0.0.1` | Internal game server host |
-| `GAME_TCP_PORT` | `27016` | Internal TCP stream port |
-| `WS_PATH` | `/game` | WebSocket upgrade path |
+| Listener | Port | Purpose |
+|----------|------|---------|
+| Node relay | `8080` (or Railway `PORT` if different) | HTTPS `/health`, WebSocket `/game` |
+| C++ game server | `27016` (`RAILWAY_TCP_APPLICATION_PORT`) | Desktop `--transport tcp` via TCP Proxy |
+
+### If `/health` returns 502
+
+Railway sometimes sets `PORT=27016` (same as the TCP proxy port). HTTP then hits the game server instead of Node → 502.
+
+**Fix in Railway UI:**
+
+1. **Networking → Public domain** (your `*.up.railway.app` URL)
+2. Set **target port** to **`8080`** (not 27016)
+3. Redeploy
+
+Deploy logs should show:
+
+```
+Boot: relay PORT=8080 game TCP=27016 (RAILWAY_TCP=27016)
+Relay listening on 0.0.0.0:8080/game
+```
+
+### Desktop clients (TCP Proxy)
+
+- **Networking → TCP Proxy** → internal port **27016** (creates `RAILWAY_TCP_APPLICATION_PORT`)
+- Public address e.g. `thomas.proxy.rlwy.net:13034` → use in `play_online.bat`
+- This is separate from the HTTPS domain / port 8080
+
+### Variables
+
+| Variable | Set by | Purpose |
+|----------|--------|---------|
+| `RAILWAY_TCP_APPLICATION_PORT` | Railway (TCP Proxy) | Game server TCP — **keep** |
+| `PORT` | Railway (HTTP domain) | Relay HTTP/WS — should be **8080**, not 27016 |
+| `GAME_TCP_PORT` | Optional override | Same as above if not using Railway TCP var |
 
 ## Protocol
 

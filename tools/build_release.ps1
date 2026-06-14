@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot/build_common.ps1"
 
 $root = Split-Path -Parent $PSScriptRoot
-$exeName = "TopDownSurvive"
+$exeName = "TopDownSurviveOnline"
 
 Push-Location $root
 
@@ -24,6 +24,7 @@ if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
 New-Item -ItemType Directory -Path $dist | Out-Null
 
 Copy-Item (Join-Path $root "$exeName.exe") $dist
+Copy-Item (Join-Path $PSScriptRoot "play_online.bat") $dist
 foreach ($dir in @("characters", "map_tileset", "nature_tileset", "pickups", "sfx", "vfx")) {
     Copy-Item (Join-Path $root $dir) $dist -Recurse
 }
@@ -33,6 +34,7 @@ Remove-Item (Join-Path $dist "generated_map.png") -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "Done! Ship: $dist"
-Write-Host "Also build server: .\tools\build_server.ps1"
+Write-Host "Online:  .\dist\play_online.bat"
+Write-Host "Local:   .\dist\TopDownSurviveOnline.exe   (UDP localhost - needs local server)"
 
 Pop-Location

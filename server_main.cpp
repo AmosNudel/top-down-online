@@ -200,6 +200,12 @@ static void parseArgs(int argc, char **argv)
         if (parsed > 0 && parsed <= 65535)
             gStreamPort = static_cast<uint16_t>(parsed);
     }
+    else if (const char *railwayTcp = std::getenv("RAILWAY_TCP_APPLICATION_PORT"))
+    {
+        const int parsed = std::atoi(railwayTcp);
+        if (parsed > 0 && parsed <= 65535)
+            gStreamPort = static_cast<uint16_t>(parsed);
+    }
 }
 
 int main(int argc, char **argv)

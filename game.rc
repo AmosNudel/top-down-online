@@ -9,11 +9,11 @@ BEGIN
     BLOCK "040904E4"
     BEGIN
       VALUE "CompanyName", "Amos Nudel"
-      VALUE "FileDescription", "Top Down Survive"
+      VALUE "FileDescription", "Top Down Survive Online"
       VALUE "FileVersion", "1.0.0"
-      VALUE "InternalName", "TopDownSurvive"
-      VALUE "OriginalFilename", "TopDownSurvive.exe"
-      VALUE "ProductName", "Top Down Survive"
+      VALUE "InternalName", "TopDownSurviveOnline"
+      VALUE "OriginalFilename", "TopDownSurviveOnline.exe"
+      VALUE "ProductName", "Top Down Survive Online"
       VALUE "ProductVersion", "1.0.0"
     END
   END

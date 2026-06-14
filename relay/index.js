@@ -2,15 +2,31 @@ const http = require("http");
 const net = require("net");
 const WebSocket = require("ws");
 
-const PORT = Number(process.env.PORT || 8080);
+const GAME_TCP_HOST = process.env.GAME_TCP_HOST || "127.0.0.1";
+const GAME_TCP_PORT = Number(
+  process.env.RAILWAY_TCP_APPLICATION_PORT ||
+    process.env.GAME_TCP_PORT ||
+    27016
+);
+
+let PORT = Number(process.env.PORT || 8080);
 if (!Number.isFinite(PORT) || PORT <= 0) {
   console.error("Invalid PORT env:", process.env.PORT);
   process.exit(1);
 }
 
+if (PORT === GAME_TCP_PORT) {
+  PORT = Number(process.env.HTTP_PORT || 8080);
+  console.warn(
+    `PORT conflict: game TCP is ${GAME_TCP_PORT}; relay HTTP/WebSocket using ${PORT}.`
+  );
+  console.warn(
+    "In Railway: Networking → public domain → set target port to",
+    String(PORT)
+  );
+}
+
 console.log(`Relay booting on 0.0.0.0:${PORT}`);
-const GAME_TCP_HOST = process.env.GAME_TCP_HOST || "127.0.0.1";
-const GAME_TCP_PORT = Number(process.env.GAME_TCP_PORT || 27016);
 const WS_PATH = process.env.WS_PATH || "/game";
 
 function writeFrame(socket, payload) {
