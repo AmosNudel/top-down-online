@@ -4,11 +4,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     g++ \
     make \
-    libraylib-dev \
+    git \
+    ca-certificates \
     libgl1-mesa-dev \
+    libglu1-mesa-dev \
     libx11-dev \
+    libxrandr-dev \
+    libxinerama-dev \
+    libxcursor-dev \
+    libxi-dev \
+    libasound2-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+# Debian bookworm has no libraylib-dev — build raylib from source.
+ARG RAYLIB_TAG=5.5
+RUN git clone --depth 1 --branch "${RAYLIB_TAG}" https://github.com/raysan5/raylib.git /opt/raylib \
+    || git clone --depth 1 https://github.com/raysan5/raylib.git /opt/raylib
+
+WORKDIR /opt/raylib/src
+RUN make RAYLIB_LIBTYPE=STATIC PLATFORM=PLATFORM_DESKTOP BUILD_MODE=RELEASE
 
 WORKDIR /src
 COPY . .
@@ -19,6 +34,8 @@ RUN test -f thirdparty/enet/include/enet/enet.h || ( \
 RUN make clean 2>/dev/null || true
 RUN make \
     PROJECT_NAME=TopDownSurviveServer \
+    RAYLIB_PATH=/opt/raylib \
+    RAYLIB_LIBTYPE=STATIC \
     "OBJS=server_main.cpp BaseCharacter.cpp Character.cpp Enemy.cpp GameSimulation.cpp NetClient.cpp NetCommon.cpp NetServer.cpp NetStreamServer.cpp NetGameHost.cpp Pickup.cpp Prop.cpp Thunderstrike.cpp TileMap.cpp thirdparty/enet/callbacks.c thirdparty/enet/compress.c thirdparty/enet/host.c thirdparty/enet/list.c thirdparty/enet/packet.c thirdparty/enet/peer.c thirdparty/enet/protocol.c thirdparty/enet/unix.c" \
     "ENET_CFLAGS=-Ithirdparty/enet/include" \
     BUILD_MODE=RELEASE
@@ -33,9 +50,15 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libraylib-dev \
     libgl1 \
     libx11-6 \
+    libxext6 \
+    libxrandr2 \
+    libxinerama1 \
+    libxcursor1 \
+    libxi6 \
+    libasound2 \
+    libstdc++6 \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
