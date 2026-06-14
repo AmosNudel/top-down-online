@@ -23,6 +23,21 @@ namespace
         const float angle = (2.f * PI * idx) / count;
         return {cosf(angle) * ring, sinf(angle) * ring};
     }
+
+    Rectangle inflateCollisionRec(Rectangle rec, float minSize)
+    {
+        if (rec.width < minSize)
+        {
+            rec.x -= (minSize - rec.width) * 0.5f;
+            rec.width = minSize;
+        }
+        if (rec.height < minSize)
+        {
+            rec.y -= (minSize - rec.height) * 0.5f;
+            rec.height = minSize;
+        }
+        return rec;
+    }
 }
 
 GameSimulation::GameSimulation()
@@ -387,6 +402,7 @@ void GameSimulation::tickServer(float dt)
 
     tickEnemyWaves(dt);
 
+    updateEnemyCameraAnchors();
     refreshEnemyChaseTargets();
     retargetEnemiesFromDeadPlayers();
 
@@ -400,24 +416,23 @@ void GameSimulation::tickServer(float dt)
 
 void GameSimulation::tickEnemyPlayerContactDamage(float dt)
 {
+    const float minContact = GameConfig::kContactHitboxMin;
+
     for (auto &enemy : enemies)
     {
         if (!enemy.getAlive())
             continue;
 
-        Rectangle enemyRec = enemy.getWorldCollisionRec();
-        Vector2 enemyCenter = enemy.getWorldCenter();
-        float enemyRadius = enemyRec.width * 0.35f;
+        Rectangle enemyRec = inflateCollisionRec(enemy.getWorldCollisionRec(), minContact);
         for (int i = 0; i < (int)players.size(); i++)
         {
             auto &entry = players[i];
             if (!entry.slot.connected || !entry.slot.inMatch || !entry.character.getAlive())
                 continue;
 
-            Rectangle playerRec = entry.character.getWorldCollisionRec();
-            float playerRadius = playerRec.width * 0.35f;
-            if (Vector2Distance(entry.character.getWorldCenter(), enemyCenter)
-                > playerRadius + enemyRadius)
+            Rectangle playerRec = inflateCollisionRec(
+                entry.character.getWorldCollisionRec(), minContact);
+            if (!CheckCollisionRecs(playerRec, enemyRec))
                 continue;
 
             entry.character.takeDamage(enemy.getDamagePerSec() * dt);

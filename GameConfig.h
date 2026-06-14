@@ -41,6 +41,8 @@ namespace GameConfig
     constexpr int kGroupSpawnMax = 16;
 
     constexpr float kPlayerSpawnMinSpacing = 140.f;
+    // Minimum body hitbox used for enemy contact damage (covers headless / missing textures).
+    constexpr float kContactHitboxMin = 72.f;
 
     constexpr float kMapScale = 4.f;
     constexpr int kMapCols = 48;
