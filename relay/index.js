@@ -14,7 +14,8 @@ function writeFrame(socket, payload) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url === "/health") {
+  const path = (req.url || "/").split("?")[0];
+  if (path === "/health" || path === "/health/") {
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("ok");
     return;
@@ -82,6 +83,12 @@ wss.on("connection", (ws, req) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Relay listening on :${PORT}${WS_PATH}`);
+  console.log(`Relay listening on 0.0.0.0:${PORT}${WS_PATH}`);
+  console.log(`Health check: http://0.0.0.0:${PORT}/health`);
   console.log(`Forwarding WebSocket -> TCP ${GAME_TCP_HOST}:${GAME_TCP_PORT}`);
+});
+
+server.on("error", (err) => {
+  console.error("Relay failed to start:", err);
+  process.exit(1);
 });

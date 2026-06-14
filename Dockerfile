@@ -75,9 +75,9 @@ RUN chmod +x /app/start.sh /app/TopDownSurviveServer
 
 ENV GAME_TCP_HOST=127.0.0.1
 ENV GAME_TCP_PORT=27016
-ENV PORT=8080
 ENV WS_PATH=/game
 
+# Railway injects PORT at runtime; do not hardcode it here.
 EXPOSE 8080
 
 CMD ["xvfb-run", "-a", "/app/start.sh"]

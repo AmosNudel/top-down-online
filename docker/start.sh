@@ -1,5 +1,6 @@
 #!/bin/sh
-set -e
+# Keep the relay as the main process so Railway always gets /health even if
+# the game server crashes or is still starting.
 
 GAME_TCP_PORT="${GAME_TCP_PORT:-27016}"
 
@@ -7,10 +8,11 @@ echo "Starting game server on TCP ${GAME_TCP_PORT} and UDP 27015..."
 ./TopDownSurviveServer --tcp-port "${GAME_TCP_PORT}" --port 27015 &
 SERVER_PID=$!
 
+cleanup() {
+  kill "${SERVER_PID}" 2>/dev/null || true
+}
+trap cleanup INT TERM EXIT
+
 echo "Starting WebSocket relay on PORT ${PORT:-8080}..."
 cd relay
-npm start &
-RELAY_PID=$!
-
-trap 'kill ${SERVER_PID} ${RELAY_PID} 2>/dev/null || true' INT TERM
-wait ${SERVER_PID} ${RELAY_PID}
+exec node index.js
