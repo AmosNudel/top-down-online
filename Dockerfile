@@ -46,7 +46,8 @@ WORKDIR /relay
 COPY relay/package.json relay/package-lock.json* ./
 RUN npm install --omit=dev
 
-FROM debian:bookworm-slim
+# Final runtime: Node for relay + xvfb/xauth for headless raylib server.
+FROM node:20-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -60,6 +61,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libstdc++6 \
     xvfb \
+    xauth \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
