@@ -1,4 +1,4 @@
-#include <prop.h>
+#include "Prop.h"
 #include <raymath.h>
 
 Prop::Prop(Vector2 pos, Texture2D tex):
