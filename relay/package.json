@@ -1,0 +1,16 @@
+{
+  "name": "top-down-survive-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebSocket-to-TCP relay for Top Down Survive game server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

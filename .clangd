@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - -IC:/raylib/raylib/src
+    - -IC:/raylib/raylib/src/external
+    - -Ithirdparty/enet/include
+    - -std=c++14
+    - -DPLATFORM_DESKTOP
+    - -D_DEFAULT_SOURCE

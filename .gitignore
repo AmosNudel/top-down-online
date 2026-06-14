@@ -1,0 +1,15 @@
+*.exe
+*.dsym
+main
+game.log
+game_*.log
+server.log
+dist-server/server.log
+generated_map.png
+dist/
+installer/
+build/
+TopDownSurvive.html
+TopDownSurvive.js
+TopDownSurvive.wasm
+TopDownSurvive.data

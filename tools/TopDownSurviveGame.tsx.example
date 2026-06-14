@@ -1,0 +1,22 @@
+"use client";
+
+import { useEffect } from "react";
+
+export default function TopDownSurviveGame() {
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
+    return (
+        <div className="w-full flex flex-col items-center justify-center px-2 sm:px-4 py-4">
+            <div className="relative mx-auto w-full aspect-square max-w-[720px]">
+                <iframe
+                    src="/top-down-survive/index.html"
+                    className="absolute inset-0 h-full w-full border-0 rounded-lg shadow-2xl"
+                    title="Top Down Survive"
+                    allowFullScreen
+                />
+            </div>
+        </div>
+    );
+}

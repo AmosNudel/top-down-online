@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no">
+    <title>Top Down Survive</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+      canvas.emscripten {
+        border: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        outline: none;
+      }
+      #overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        pointer-events: none;
+      }
+      /* Invisible input used only to summon the mobile keyboard; drawn on canvas. */
+      #player-name-input {
+        display: none;
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        pointer-events: none;
+        z-index: -1;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    <input id="player-name-input" type="text" maxlength="3" autocomplete="off"
+           autocapitalize="characters" enterkeyhint="done" inputmode="text" />
+    <div id="overlay">Loading...</div>
+
+    <script>
+      var overlay = document.getElementById('overlay');
+      var Module = {
+        canvas: document.getElementById('canvas'),
+        setStatus: function(text) {
+          if (!text) {
+            overlay.style.display = 'none';
+            return;
+          }
+          overlay.textContent = text;
+        },
+        onRuntimeInitialized: function() {
+          overlay.style.display = 'none';
+        }
+      };
+
+      window.addEventListener('keydown', function unlockAudio() {
+        if (typeof Module.resumeAudioContext === 'function') {
+          Module.resumeAudioContext();
+        }
+      }, { once: true });
+
+      // Set before the game loads to enable online multiplayer from Next.js:
+      // window.GAME_WS_URL = 'wss://your-app.up.railway.app/game';
+      window.GAME_WS_URL = window.GAME_WS_URL || '';
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

@@ -1,0 +1,9 @@
+dist/
+dist-server/
+*.exe
+*.o
+build/
+.git/
+thirdparty/enet/.git/
+relay/node_modules/
+*.log
