@@ -1,11 +1,16 @@
 #!/bin/sh
-# Keep the relay as the main process so Railway always gets /health even if
-# the game server crashes or is still starting.
+# Start the HTTP/WebSocket relay immediately (Railway healthcheck hits /health).
+# Run the raylib game server under xvfb in the background.
 
 GAME_TCP_PORT="${GAME_TCP_PORT:-27016}"
 
-echo "Starting game server on TCP ${GAME_TCP_PORT} and UDP 27015..."
-./TopDownSurviveServer --tcp-port "${GAME_TCP_PORT}" --port 27015 &
+echo "Boot: PORT=${PORT:-unset} GAME_TCP_PORT=${GAME_TCP_PORT}"
+
+(
+  cd /app || exit 1
+  echo "Starting game server under xvfb..."
+  xvfb-run -a ./TopDownSurviveServer --tcp-port "${GAME_TCP_PORT}" --port 27015
+) >> /tmp/game-server.log 2>&1 &
 SERVER_PID=$!
 
 cleanup() {
@@ -14,5 +19,5 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 echo "Starting WebSocket relay on PORT ${PORT:-8080}..."
-cd relay
+cd /app/relay || exit 1
 exec node index.js

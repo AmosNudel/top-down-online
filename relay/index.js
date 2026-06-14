@@ -3,6 +3,12 @@ const net = require("net");
 const WebSocket = require("ws");
 
 const PORT = Number(process.env.PORT || 8080);
+if (!Number.isFinite(PORT) || PORT <= 0) {
+  console.error("Invalid PORT env:", process.env.PORT);
+  process.exit(1);
+}
+
+console.log(`Relay booting on 0.0.0.0:${PORT}`);
 const GAME_TCP_HOST = process.env.GAME_TCP_HOST || "127.0.0.1";
 const GAME_TCP_PORT = Number(process.env.GAME_TCP_PORT || 27016);
 const WS_PATH = process.env.WS_PATH || "/game";

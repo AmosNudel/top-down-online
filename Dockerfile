@@ -80,4 +80,4 @@ ENV WS_PATH=/game
 # Railway injects PORT at runtime; do not hardcode it here.
 EXPOSE 8080
 
-CMD ["xvfb-run", "-a", "/app/start.sh"]
+CMD ["/app/start.sh"]
