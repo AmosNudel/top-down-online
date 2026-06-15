@@ -19,6 +19,7 @@ public:
     void takeDamage(float damage);
     void heal(float amount);
     void playHealFeedback();
+    void playHitFeedback();
     void reset();
 
     // sword charge: lands enough sword hits and the blade glows, unlocking thunder

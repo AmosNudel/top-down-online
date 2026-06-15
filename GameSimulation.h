@@ -252,6 +252,7 @@ private:
         const std::vector<NetEnemySnapshot> &enemySnaps);
     void pruneSnapshotBuffer(std::chrono::steady_clock::time_point displayTime);
     std::deque<BufferedSnapshot> snapshotBuffer;
+    std::unordered_map<uint16_t, Vector2> latestEnemyServerPos;
     std::chrono::steady_clock::time_point lastSnapshotTime{};
     std::chrono::steady_clock::time_point lastSnapshotArrivalTime{};
     bool hasSnapshotTime{false};

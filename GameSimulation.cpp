@@ -1309,6 +1309,7 @@ void GameSimulation::resetWorldStateSync()
 {
     lastWorldStateTick = 0;
     snapshotBuffer.clear();
+    latestEnemyServerPos.clear();
     hasSnapshotTime = false;
     hasSnapshotArrivalTime = false;
     awaitingSpawnSync = false;
@@ -1321,6 +1322,7 @@ void GameSimulation::beginMatchPrewarm()
 
     lastWorldStateTick = 0;
     snapshotBuffer.clear();
+    latestEnemyServerPos.clear();
     hasSnapshotTime = false;
     awaitingSpawnSync = true;
 }
@@ -1616,11 +1618,23 @@ void GameSimulation::tickInterpolation()
         if (localPlayerId >= 0)
         {
             const Character *local = getPlayerCharacter(localPlayerId);
-            if (local && local->getAlive())
+            const bool targetsLocal =
+                enemy.getTargetPlayerId() == static_cast<uint8_t>(localPlayerId);
+            if (local && local->getAlive() && targetsLocal)
             {
-                const float nearDist = Vector2Distance(pos, local->getWorldCenter());
-                if (nearDist < GameConfig::kEnemyNearSnapDist)
-                    pos = toPos;
+                auto latestIt = latestEnemyServerPos.find(id);
+                if (latestIt != latestEnemyServerPos.end())
+                    pos = latestIt->second;
+            }
+            else if (local && local->getAlive())
+            {
+                auto latestIt = latestEnemyServerPos.find(id);
+                if (latestIt != latestEnemyServerPos.end())
+                {
+                    const float nearDist = Vector2Distance(latestIt->second, local->getWorldCenter());
+                    if (nearDist < GameConfig::kEnemyNearSnapDist)
+                        pos = latestIt->second;
+                }
             }
         }
 
@@ -1938,7 +1952,9 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
         entry.character.setAlive((snap.flags & NET_PLAYER_ALIVE) != 0);
         const float prevHealth = entry.character.getHealth();
         entry.character.setHealth(snap.health);
-        if (isLocal && snap.health > prevHealth + 0.5f)
+        if (isLocal && snap.health < prevHealth - 0.5f)
+            entry.character.playHitFeedback();
+        else if (isLocal && snap.health > prevHealth + 0.5f)
             entry.character.playHealFeedback();
         entry.character.setCharged(snap.charged != 0);
         entry.character.setNetworkVisualState(snap.moving != 0, snap.attackHeld != 0);
@@ -1970,6 +1986,8 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
             continue;
 
         Vector2 pos{snap.worldX, snap.worldY};
+        latestEnemyServerPos[snap.id] = pos;
+
         Texture2D idleTex = snap.enemyType == 0 ? goblinIdle : slimeIdle;
         Texture2D runTex = snap.enemyType == 0 ? goblinRun : slimeRun;
 

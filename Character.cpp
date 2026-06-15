@@ -239,17 +239,21 @@ void Character::setHealth(float value)
 void Character::takeDamage(float damage)
 {
     health -= damage;
-    damageFlash = flashHold; // (re)start the flash window on every hit
+    playHitFeedback();
 
-    // hurt sound on a longer interval than the flash so it isn't distracting
+    if (health < 0.0f)
+        setAlive(false);
+}
+
+void Character::playHitFeedback()
+{
+    damageFlash = flashHold;
+
     if (hitSoundTimer <= 0.0f)
     {
         PlayWithRandomPitch(hitSound, 0.9f, 1.1f);
         hitSoundTimer = hitSoundInterval;
     }
-
-    if (health < 0.0f)
-        setAlive(false);
 }
 
 void Character::heal(float amount)

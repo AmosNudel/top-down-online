@@ -60,7 +60,7 @@ namespace GameConfig
     constexpr float kReconcileHardDist = 96.f;
     constexpr float kInterpExtrapolateSec = 0.18f;
     constexpr float kInterpBufferDelaySec = 0.09f; // ~2 snapshots at 45 Hz
-    constexpr float kEnemyNearSnapDist = 220.f; // use latest server pos when close to local player
+    constexpr float kEnemyNearSnapDist = 280.f; // use latest server pos when close to local player
     constexpr std::size_t kInterpBufferMaxSnapshots = 16;
     constexpr std::size_t kMinSnapshotsForPlay = 3;
 }
