@@ -18,29 +18,12 @@
 #include <algorithm>
 #include <cstdio>
 #include <cctype>
-#include <cstdio>
-#include <cstdarg>
 #include <cstring>
 #include <cmath>
 
-#ifndef PLATFORM_WEB
-static void ClientNetLog(const char *fmt, ...)
-{
-    FILE *f = std::fopen("game.log", "a");
-    if (!f)
-        return;
+#include "ClientDiagLog.h"
 
-    va_list args;
-    va_start(args, fmt);
-    std::vfprintf(f, fmt, args);
-    va_end(args);
-    std::fputc('\n', f);
-    std::fflush(f);
-    std::fclose(f);
-}
-#else
-static void ClientNetLog(const char *, ...) {}
-#endif
+#define ClientNetLog ClientDiagLog
 
 enum class GameState
 {
@@ -392,6 +375,9 @@ int main(int argc, char **argv)
     InitWindow(960, 960, "Top Down Survive Online");
     SetWindowMinSize(gameWidth, gameHeight);
     ChangeDirectory(GetApplicationDirectory());
+#if !defined(PLATFORM_WEB)
+    ClientDiagLog("=== Top Down Survive Online started (log: %s) ===", ClientDiagLogPath());
+#endif
 
     RenderTexture2D gameTarget = LoadRenderTexture(gameWidth, gameHeight);
     SetTextureFilter(gameTarget.texture, TEXTURE_FILTER_POINT);
@@ -419,6 +405,13 @@ int main(int argc, char **argv)
 #else
     NetSession netClient;
     ParseClientArgs(argc, argv, offlineMode, serverHost, serverPort, transport);
+    if (!offlineMode)
+    {
+        ClientDiagLog(
+            "connect cfg transport=%s host=%s port=%u",
+            transport == NetTransport::Stream ? "tcp" : "enet",
+            serverHost.c_str(), static_cast<unsigned>(serverPort));
+    }
 #endif
     sim.setOnlineClientMode(!offlineMode);
     if (offlineMode)

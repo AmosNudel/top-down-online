@@ -1,33 +1,12 @@
 #include "GameSimulation.h"
 #include "NetCommon.h"
 #include "TextureUtil.h"
+#include "ClientDiagLog.h"
 #include <raymath.h>
 #include <algorithm>
 #include <cmath>
-#include <cstdarg>
-#include <cstdio>
 #include <cstring>
 #include <unordered_map>
-
-#if !defined(PLATFORM_WEB)
-namespace
-{
-    void GameNetDiagLog(const char *fmt, ...)
-    {
-        FILE *f = std::fopen("game.log", "a");
-        if (!f)
-            return;
-
-        va_list args;
-        va_start(args, fmt);
-        std::vfprintf(f, fmt, args);
-        va_end(args);
-        std::fputc('\n', f);
-        std::fflush(f);
-        std::fclose(f);
-    }
-}
-#endif
 
 namespace
 {
@@ -1444,14 +1423,14 @@ void GameSimulation::reconcileLocalPlayerPosition(Character &player, Vector2 ser
     if (err > GameConfig::kReconcileHardDist)
     {
 #if !defined(PLATFORM_WEB)
-        GameNetDiagLog("reconcile hard snap err=%.1fpx", err);
+        ClientDiagLog("reconcile hard snap err=%.1fpx", err);
 #endif
         player.setWorldPos(serverPos);
     }
     else if (err > GameConfig::kReconcileSoftDist)
     {
 #if !defined(PLATFORM_WEB)
-        GameNetDiagLog("reconcile soft blend err=%.1fpx", err);
+        ClientDiagLog("reconcile soft blend err=%.1fpx", err);
 #endif
         player.setWorldPos(Vector2Lerp(predicted, serverPos, 0.35f));
     }
