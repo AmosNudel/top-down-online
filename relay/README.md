@@ -29,7 +29,7 @@ Or WebSocket web build:
 
 ```html
 <script>
-  window.GAME_WS_URL = 'ws://127.0.0.1:8080/game';
+  window.GAME_WS_URL = "ws://127.0.0.1:8080/game";
 </script>
 ```
 
@@ -39,9 +39,9 @@ Railway adds **`RAILWAY_TCP_APPLICATION_PORT=27016`** when you enable TCP Proxy 
 
 You run **two listeners** in one container:
 
-| Listener | Port | Purpose |
-|----------|------|---------|
-| Node relay | `8080` (or Railway `PORT` if different) | HTTPS `/health`, WebSocket `/game` |
+| Listener        | Port                                     | Purpose                                 |
+| --------------- | ---------------------------------------- | --------------------------------------- |
+| Node relay      | `8080` (or Railway `PORT` if different)  | HTTPS `/health`, WebSocket `/game`      |
 | C++ game server | `27016` (`RAILWAY_TCP_APPLICATION_PORT`) | Desktop `--transport tcp` via TCP Proxy |
 
 ### If `/health` returns 502
@@ -69,11 +69,11 @@ Relay listening on 0.0.0.0:8080/game
 
 ### Variables
 
-| Variable | Set by | Purpose |
-|----------|--------|---------|
-| `RAILWAY_TCP_APPLICATION_PORT` | Railway (TCP Proxy) | Game server TCP — **keep** |
-| `PORT` | Railway (HTTP domain) | Relay HTTP/WS — should be **8080**, not 27016 |
-| `GAME_TCP_PORT` | Optional override | Same as above if not using Railway TCP var |
+| Variable                       | Set by                | Purpose                                       |
+| ------------------------------ | --------------------- | --------------------------------------------- |
+| `RAILWAY_TCP_APPLICATION_PORT` | Railway (TCP Proxy)   | Game server TCP — **keep**                    |
+| `PORT`                         | Railway (HTTP domain) | Relay HTTP/WS — should be **8080**, not 27016 |
+| `GAME_TCP_PORT`                | Optional override     | Same as above if not using Railway TCP var    |
 
 ## Protocol
 

@@ -76,6 +76,8 @@ bool NetStreamClient::connect(const char *hostName, uint16_t port, uint32_t time
         return false;
     }
 
+    netSetTcpNoDelay(impl->socket);
+
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (std::chrono::steady_clock::now() < deadline)
     {

@@ -7,6 +7,9 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#ifndef TCP_NODELAY
+#define TCP_NODELAY 0x0001
+#endif
 using NetSocket = SOCKET;
 constexpr NetSocket kInvalidSocket = INVALID_SOCKET;
 inline int netSocketLastError() { return WSAGetLastError(); }
@@ -29,6 +32,7 @@ inline void netSocketShutdown(NetSocket s)
 #include <cerrno>
 #include <fcntl.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -83,6 +87,14 @@ inline bool netSetNonBlocking(NetSocket socket)
         return false;
     return fcntl(socket, F_SETFL, flags | O_NONBLOCK) == 0;
 #endif
+}
+
+inline bool netSetTcpNoDelay(NetSocket socket)
+{
+    int one = 1;
+    return setsockopt(
+               socket, IPPROTO_TCP, TCP_NODELAY,
+               reinterpret_cast<const char *>(&one), sizeof(one)) == 0;
 }
 
 #endif // NET_STREAM_SOCKET_H

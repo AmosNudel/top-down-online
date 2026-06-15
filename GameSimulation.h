@@ -4,6 +4,7 @@
 #include "Character.h"
 #include "Enemy.h"
 #include "GameConfig.h"
+#include "NetCommon.h"
 #include "Pickup.h"
 #include "PlayerSlot.h"
 #include "Prop.h"
@@ -11,7 +12,9 @@
 #include "TileMap.h"
 #include <raylib.h>
 #include <chrono>
+#include <deque>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 enum class MatchPhase
@@ -79,6 +82,7 @@ public:
     bool applyLobbySyncPacket(const uint8_t *data, size_t size);
     void applyJoinAck(int playerId, uint8_t colorIndex, const char *name);
     void resetWorldStateSync();
+    float noteSnapshotArrival(uint32_t serverTick);
     void predictLocalPlayerMovement(int localPlayerId, float dt, const PlayerInput &input);
     void predictLocalThunderCast(int localPlayerId, const PlayerInput &input);
 
@@ -226,13 +230,27 @@ private:
         Vector2 from{};
         Vector2 to{};
     };
+    struct BufferedSnapshot
+    {
+        std::chrono::steady_clock::time_point receiveTime{};
+        uint32_t serverTick{0};
+        std::unordered_map<uint8_t, Vector2> playerPos;
+        std::unordered_map<uint16_t, Vector2> enemyPos;
+    };
     void reconcileLocalPlayerPosition(Character &player, Vector2 serverPos);
     static Vector2 interpolateEntityPos(const EntityInterp &interp, float t);
+    static Vector2 lerpPos(Vector2 from, Vector2 to, float t);
     static void updateFacingFromMotion(BaseCharacter &entity, Vector2 motion);
-    std::vector<EntityInterp> playerInterp;
-    std::vector<EntityInterp> enemyInterp;
+    void pushSnapshotBuffer(
+        uint32_t serverTick,
+        const std::vector<NetPlayerSnapshot> &playerSnaps,
+        const std::vector<NetEnemySnapshot> &enemySnaps);
+    void pruneSnapshotBuffer(std::chrono::steady_clock::time_point displayTime);
+    std::deque<BufferedSnapshot> snapshotBuffer;
     std::chrono::steady_clock::time_point lastSnapshotTime{};
+    std::chrono::steady_clock::time_point lastSnapshotArrivalTime{};
     bool hasSnapshotTime{false};
+    bool hasSnapshotArrivalTime{false};
 };
 
 #endif // GAME_SIMULATION_H

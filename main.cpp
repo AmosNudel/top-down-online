@@ -18,9 +18,27 @@
 #include <algorithm>
 #include <cstdio>
 #include <cctype>
+#include <cstdio>
+#include <cstdarg>
 #include <cstring>
+#include <cmath>
 
 #ifndef PLATFORM_WEB
+static void ClientNetLog(const char *fmt, ...)
+{
+    FILE *f = std::fopen("game.log", "a");
+    if (!f)
+        return;
+
+    va_list args;
+    va_start(args, fmt);
+    std::vfprintf(f, fmt, args);
+    va_end(args);
+    std::fputc('\n', f);
+    std::fflush(f);
+    std::fclose(f);
+}
+#else
 static void ClientNetLog(const char *, ...) {}
 #endif
 
@@ -415,6 +433,12 @@ int main(int argc, char **argv)
     bool connectPending = false;
     double connectAttemptStartTime = 0.0;
     constexpr double kJoinResponseTimeoutSec = 12.0;
+#ifndef PLATFORM_WEB
+    double inputSendAccum = 0.0;
+    PlayerInput lastSentInput{};
+    bool hasLastSentInput = false;
+    const double inputSendInterval = 1.0 / static_cast<double>(GameConfig::kServerTickRate);
+#endif
 
     auto cancelPendingConnect = [&](const char *message)
     {
@@ -499,8 +523,21 @@ int main(int argc, char **argv)
             const bool applied = sim.applyWorldStatePacket(data, size);
             if (applied)
             {
-                ClientNetLog("S_WORLD_STATE tick=%u phase=%d players=%d queue=%d",
-                             hdr.tick, hdr.phase, hdr.playerCount, sim.getQueueCount());
+                const float interArrivalMs = sim.noteSnapshotArrival(hdr.tick);
+                const float expectedMs = 1000.f / GameConfig::kServerTickRate;
+                if (interArrivalMs >= 0.f)
+                {
+                    ClientNetLog(
+                        "S_WORLD_STATE tick=%u phase=%d players=%d interArrival=%.1fms jitter=%.1fms",
+                        hdr.tick, hdr.phase, hdr.playerCount, interArrivalMs,
+                        std::fabs(interArrivalMs - expectedMs));
+                }
+                else
+                {
+                    ClientNetLog(
+                        "S_WORLD_STATE tick=%u phase=%d players=%d (first snapshot)",
+                        hdr.tick, hdr.phase, hdr.playerCount);
+                }
             }
             else
             {
@@ -1043,9 +1080,31 @@ int main(int argc, char **argv)
 
             if (!offlineMode && applyLocalInput)
             {
+#if !defined(PLATFORM_WEB)
+                const bool edgePress = input.attackPressed || input.thunderPressed;
+                const bool moveChanged =
+                    !hasLastSentInput ||
+                    std::fabs(input.move.x - lastSentInput.move.x) > 0.01f ||
+                    std::fabs(input.move.y - lastSentInput.move.y) > 0.01f ||
+                    input.attackHeld != lastSentInput.attackHeld;
+                inputSendAccum += dt;
+
+                const bool sendDue = inputSendAccum >= inputSendInterval;
+                if (!hasLastSentInput || edgePress || (sendDue && moveChanged))
+                {
+                    netClient.sendInput(
+                        input.move.x, input.move.y,
+                        input.attackPressed, input.attackHeld, input.thunderPressed);
+                    lastSentInput = input;
+                    hasLastSentInput = true;
+                    if (sendDue)
+                        inputSendAccum = 0.0;
+                }
+#else
                 netClient.sendInput(
                     input.move.x, input.move.y,
                     input.attackPressed, input.attackHeld, input.thunderPressed);
+#endif
                 sim.predictLocalPlayerMovement(sim.getLocalPlayerId(), dt, input);
                 sim.predictLocalThunderCast(sim.getLocalPlayerId(), input);
             }

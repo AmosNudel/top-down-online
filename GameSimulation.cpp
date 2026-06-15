@@ -4,8 +4,30 @@
 #include <raymath.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <unordered_map>
+
+#if !defined(PLATFORM_WEB)
+namespace
+{
+    void GameNetDiagLog(const char *fmt, ...)
+    {
+        FILE *f = std::fopen("game.log", "a");
+        if (!f)
+            return;
+
+        va_list args;
+        va_start(args, fmt);
+        std::vfprintf(f, fmt, args);
+        va_end(args);
+        std::fputc('\n', f);
+        std::fflush(f);
+        std::fclose(f);
+    }
+}
+#endif
 
 namespace
 {
@@ -1291,6 +1313,68 @@ bool GameSimulation::isThunderActiveForPlayer(int playerId) const
 void GameSimulation::resetWorldStateSync()
 {
     lastWorldStateTick = 0;
+    snapshotBuffer.clear();
+    hasSnapshotTime = false;
+    hasSnapshotArrivalTime = false;
+}
+
+float GameSimulation::noteSnapshotArrival(uint32_t serverTick)
+{
+    const auto now = std::chrono::steady_clock::now();
+    float interArrivalMs = -1.f;
+    if (hasSnapshotArrivalTime)
+    {
+        interArrivalMs = std::chrono::duration<float, std::milli>(now - lastSnapshotArrivalTime).count();
+    }
+
+    lastSnapshotArrivalTime = now;
+    hasSnapshotArrivalTime = true;
+    return interArrivalMs;
+}
+
+void GameSimulation::pushSnapshotBuffer(
+    uint32_t serverTick,
+    const std::vector<NetPlayerSnapshot> &playerSnaps,
+    const std::vector<NetEnemySnapshot> &enemySnaps)
+{
+    BufferedSnapshot frame{};
+    frame.receiveTime = std::chrono::steady_clock::now();
+    frame.serverTick = serverTick;
+
+    for (const auto &snap : playerSnaps)
+    {
+        if (snap.id >= GameConfig::kMaxPlayers)
+            continue;
+        frame.playerPos[snap.id] = {snap.worldX, snap.worldY};
+    }
+
+    for (const auto &snap : enemySnaps)
+    {
+        if (!snap.alive)
+            continue;
+        frame.enemyPos[snap.id] = {snap.worldX, snap.worldY};
+    }
+
+    snapshotBuffer.push_back(std::move(frame));
+    while (snapshotBuffer.size() > GameConfig::kInterpBufferMaxSnapshots)
+        snapshotBuffer.pop_front();
+}
+
+void GameSimulation::pruneSnapshotBuffer(std::chrono::steady_clock::time_point displayTime)
+{
+    const float keepBehind = GameConfig::kInterpBufferDelaySec +
+                             (2.f / GameConfig::kServerTickRate);
+    const auto pruneBefore = displayTime - std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                              std::chrono::duration<float>(keepBehind));
+
+    while (snapshotBuffer.size() > 2 &&
+           snapshotBuffer.front().receiveTime < pruneBefore)
+    {
+        snapshotBuffer.pop_front();
+    }
+
+    while (snapshotBuffer.size() > GameConfig::kInterpBufferMaxSnapshots)
+        snapshotBuffer.pop_front();
 }
 
 void GameSimulation::predictLocalPlayerMovement(int localPlayerId, float dt, const PlayerInput &input)
@@ -1358,9 +1442,27 @@ void GameSimulation::reconcileLocalPlayerPosition(Character &player, Vector2 ser
     Vector2 predicted = player.getWorldPos();
     float err = Vector2Distance(predicted, serverPos);
     if (err > GameConfig::kReconcileHardDist)
+    {
+#if !defined(PLATFORM_WEB)
+        GameNetDiagLog("reconcile hard snap err=%.1fpx", err);
+#endif
         player.setWorldPos(serverPos);
+    }
     else if (err > GameConfig::kReconcileSoftDist)
+    {
+#if !defined(PLATFORM_WEB)
+        GameNetDiagLog("reconcile soft blend err=%.1fpx", err);
+#endif
         player.setWorldPos(Vector2Lerp(predicted, serverPos, 0.35f));
+    }
+}
+
+Vector2 GameSimulation::lerpPos(Vector2 from, Vector2 to, float t)
+{
+    EntityInterp interp{};
+    interp.from = from;
+    interp.to = to;
+    return interpolateEntityPos(interp, t);
 }
 
 Vector2 GameSimulation::interpolateEntityPos(const EntityInterp &interp, float t)
@@ -1408,37 +1510,91 @@ void GameSimulation::tickResultsCountdownClient(float dt)
 
 void GameSimulation::tickInterpolation()
 {
-    if (!onlineClientMode || !hasSnapshotTime)
+    if (!onlineClientMode || snapshotBuffer.size() < 1)
         return;
 
-    const float snapshotInterval = 1.f / GameConfig::kServerTickRate;
-    auto now = std::chrono::steady_clock::now();
-    float elapsed = std::chrono::duration<float>(now - lastSnapshotTime).count();
-    float t = elapsed / snapshotInterval;
+    const auto now = std::chrono::steady_clock::now();
+    const auto displayTime = now - std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                        std::chrono::duration<float>(GameConfig::kInterpBufferDelaySec));
+    pruneSnapshotBuffer(displayTime);
+
+    const BufferedSnapshot *fromSnap = nullptr;
+    const BufferedSnapshot *toSnap = nullptr;
+
+    for (size_t i = 0; i + 1 < snapshotBuffer.size(); i++)
+    {
+        if (snapshotBuffer[i].receiveTime <= displayTime &&
+            snapshotBuffer[i + 1].receiveTime >= displayTime)
+        {
+            fromSnap = &snapshotBuffer[i];
+            toSnap = &snapshotBuffer[i + 1];
+            break;
+        }
+    }
+
+    if (!fromSnap)
+    {
+        if (snapshotBuffer.size() >= 2)
+        {
+            fromSnap = &snapshotBuffer[snapshotBuffer.size() - 2];
+            toSnap = &snapshotBuffer.back();
+        }
+        else
+        {
+            fromSnap = &snapshotBuffer.front();
+            toSnap = fromSnap;
+        }
+    }
+    else if (!toSnap)
+    {
+        toSnap = fromSnap;
+    }
+
+    float t = 0.f;
+    if (fromSnap != toSnap)
+    {
+        const float span = std::chrono::duration<float>(toSnap->receiveTime - fromSnap->receiveTime).count();
+        if (span > 0.f)
+        {
+            const float elapsed = std::chrono::duration<float>(displayTime - fromSnap->receiveTime).count();
+            t = elapsed / span;
+        }
+    }
 
     for (const auto &entry : players)
     {
         if (!entry.slot.connected)
             continue;
 
-        int id = entry.slot.id;
+        const int id = entry.slot.id;
         if (id == localPlayerId)
             continue;
-        if (id < 0 || id >= (int)playerInterp.size())
+
+        auto fromIt = fromSnap->playerPos.find(static_cast<uint8_t>(id));
+        auto toIt = toSnap->playerPos.find(static_cast<uint8_t>(id));
+        if (fromIt == fromSnap->playerPos.end() && toIt == toSnap->playerPos.end())
             continue;
 
-        const EntityInterp &interp = playerInterp[id];
-        Vector2 pos = interpolateEntityPos(interp, t);
+        Vector2 fromPos = fromIt != fromSnap->playerPos.end() ? fromIt->second : toIt->second;
+        Vector2 toPos = toIt != toSnap->playerPos.end() ? toIt->second : fromPos;
+        Vector2 pos = lerpPos(fromPos, toPos, t);
         players[id].character.setWorldPosInterpolated(pos);
-        updateFacingFromMotion(players[id].character, Vector2Subtract(interp.to, interp.from));
+        updateFacingFromMotion(players[id].character, Vector2Subtract(toPos, fromPos));
     }
 
-    for (size_t i = 0; i < enemyInterp.size() && i < enemies.size(); i++)
+    for (auto &enemy : enemies)
     {
-        const EntityInterp &interp = enemyInterp[i];
-        Vector2 pos = interpolateEntityPos(interp, t);
-        enemies[i].setWorldPosInterpolated(pos);
-        updateFacingFromMotion(enemies[i], Vector2Subtract(interp.to, interp.from));
+        const uint16_t id = enemy.getId();
+        auto fromIt = fromSnap->enemyPos.find(id);
+        auto toIt = toSnap->enemyPos.find(id);
+        if (fromIt == fromSnap->enemyPos.end() && toIt == toSnap->enemyPos.end())
+            continue;
+
+        Vector2 fromPos = fromIt != fromSnap->enemyPos.end() ? fromIt->second : toIt->second;
+        Vector2 toPos = toIt != toSnap->enemyPos.end() ? toIt->second : fromPos;
+        Vector2 pos = lerpPos(fromPos, toPos, t);
+        enemy.setWorldPosInterpolated(pos);
+        updateFacingFromMotion(enemy, Vector2Subtract(toPos, fromPos));
     }
 }
 
@@ -1707,20 +1863,12 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
             players.emplace_back();
 
         PlayerEntry &entry = players[snap.id];
-        Vector2 currentPos = entry.character.getWorldPos();
         Vector2 serverPos{snap.worldX, snap.worldY};
         const bool isLocal = (static_cast<int>(snap.id) == localPlayerId);
 
         if (isLocal)
         {
             reconcileLocalPlayerPosition(entry.character, serverPos);
-        }
-        else
-        {
-            while (playerInterp.size() <= snap.id)
-                playerInterp.emplace_back();
-            playerInterp[snap.id].from = currentPos;
-            playerInterp[snap.id].to = serverPos;
         }
 
         entry.slot.id = snap.id;
@@ -1758,16 +1906,8 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
             markPlayerDisconnected(i);
     }
 
-    enemyInterp.resize(enemies.size());
-    std::unordered_map<uint16_t, Vector2> prevEnemyPos;
-    prevEnemyPos.reserve(enemies.size());
-    for (const auto &enemy : enemies)
-        prevEnemyPos[enemy.getId()] = enemy.getWorldPos();
-
     std::vector<Enemy> nextEnemies;
     nextEnemies.reserve(enemySnaps.size());
-    std::vector<EntityInterp> nextEnemyInterp;
-    nextEnemyInterp.reserve(enemySnaps.size());
 
     for (const auto &snap : enemySnaps)
     {
@@ -1777,11 +1917,6 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
         Vector2 pos{snap.worldX, snap.worldY};
         Texture2D idleTex = snap.enemyType == 0 ? goblinIdle : slimeIdle;
         Texture2D runTex = snap.enemyType == 0 ? goblinRun : slimeRun;
-
-        Vector2 fromPos = pos;
-        auto prevIt = prevEnemyPos.find(snap.id);
-        if (prevIt != prevEnemyPos.end())
-            fromPos = prevIt->second;
 
         nextEnemies.emplace_back(pos, idleTex, runTex);
         Enemy &enemy = nextEnemies.back();
@@ -1794,15 +1929,9 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
         enemy.setAnimationFrame(snap.frame);
         enemy.setNetworkMoving(snap.moving != 0);
         enemy.setNetworkFacing(static_cast<float>(snap.facing));
-
-        EntityInterp interp{};
-        interp.from = fromPos;
-        interp.to = pos;
-        nextEnemyInterp.push_back(interp);
     }
 
     enemies = std::move(nextEnemies);
-    enemyInterp = std::move(nextEnemyInterp);
 
     pickups.clear();
     for (const auto &snap : pickupSnaps)
@@ -1858,6 +1987,7 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
         }
     }
 
+    pushSnapshotBuffer(header.tick, playerSnaps, enemySnaps);
     lastSnapshotTime = std::chrono::steady_clock::now();
     hasSnapshotTime = true;
     refreshEnemyRenderAnchors();

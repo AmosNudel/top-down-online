@@ -169,6 +169,7 @@ void NetStreamServer::poll(int timeoutMs)
         if (client != kInvalidSocket)
         {
             netSetNonBlocking(client);
+            netSetTcpNoDelay(client);
             impl->clientSockets.push_back(client);
             impl->recvBuffers[client] = {};
             impl->sendBuffers[client] = {};

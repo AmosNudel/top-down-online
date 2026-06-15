@@ -52,13 +52,15 @@ namespace GameConfig
 
     constexpr uint16_t kDefaultServerPort = 27015;
     constexpr uint16_t kDefaultStreamPort = 27016;
-    constexpr float kServerTickRate = 30.f;
+    constexpr float kServerTickRate = 45.f;
     constexpr const char *kDefaultServerHost = "127.0.0.1";
 
     // client-side prediction / interpolation tuning
-    constexpr float kReconcileSoftDist = 12.f;
-    constexpr float kReconcileHardDist = 64.f;
-    constexpr float kInterpExtrapolateSec = 0.1f;
+    constexpr float kReconcileSoftDist = 24.f;
+    constexpr float kReconcileHardDist = 96.f;
+    constexpr float kInterpExtrapolateSec = 0.18f;
+    constexpr float kInterpBufferDelaySec = 0.09f; // ~2 snapshots at 45 Hz
+    constexpr std::size_t kInterpBufferMaxSnapshots = 16;
 }
 
 #endif // GAME_CONFIG_H
