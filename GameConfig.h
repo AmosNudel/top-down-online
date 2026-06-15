@@ -61,6 +61,7 @@ namespace GameConfig
     constexpr float kInterpExtrapolateSec = 0.18f;
     constexpr float kInterpBufferDelaySec = 0.09f; // ~2 snapshots at 45 Hz
     constexpr std::size_t kInterpBufferMaxSnapshots = 16;
+    constexpr std::size_t kMinSnapshotsForPlay = 3;
 }
 
 #endif // GAME_CONFIG_H

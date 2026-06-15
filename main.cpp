@@ -851,6 +851,9 @@ int main(int argc, char **argv)
         // ---- Queue / countdown ----
         if (state == GameState::QUEUE)
         {
+            if (!offlineMode && netClient.isConnected() && sim.getPhase() == MatchPhase::COUNTDOWN)
+                sim.tickInterpolation();
+
             ClearBackground(DARKGREEN);
             DrawCenteredText("In Queue", gameWidth, gameHeight / 2 - 100, 40, RAYWHITE);
 
@@ -872,6 +875,9 @@ int main(int argc, char **argv)
                 snprintf(countdown, sizeof(countdown), "Starting in %.0f...",
                          displayCountdown);
                 DrawCenteredText(countdown, gameWidth, gameHeight / 2, 32, GOLD);
+
+                if (!offlineMode && !sim.isMatchSyncReady())
+                    DrawCenteredText("Preparing match...", gameWidth, gameHeight / 2 + 40, 20, LIGHTGRAY);
             }
             else if (sim.canPressReady())
             {
@@ -1029,10 +1035,14 @@ int main(int argc, char **argv)
         // ---- Playing / spectating / paused ----
         const bool isPlaying = (state == GameState::PLAYING);
         const bool isSpectating = (state == GameState::SPECTATING);
+        const bool matchSyncReady = offlineMode || sim.isMatchSyncReady();
+        const bool showMatchSyncOverlay =
+            !offlineMode && netClient.isConnected() && !matchSyncReady &&
+            (sim.getPhase() == MatchPhase::COUNTDOWN || sim.getPhase() == MatchPhase::IN_PROGRESS);
 #if defined(PLATFORM_WEB)
-        const bool applyLocalInput = isPlaying && state != GameState::PAUSED;
+        const bool applyLocalInput = isPlaying && state != GameState::PAUSED && !showMatchSyncOverlay;
 #else
-        const bool applyLocalInput = isPlaying;
+        const bool applyLocalInput = isPlaying && !showMatchSyncOverlay;
 #endif
 
         if (isPlaying || isSpectating
@@ -1208,6 +1218,16 @@ int main(int argc, char **argv)
                 DrawKillScoreboard(sim, sim.getLocalPlayerId());
 
             drawMinimap();
+
+            if (showMatchSyncOverlay)
+            {
+                DrawRectangle(0, 0, gameWidth, gameHeight, ColorAlpha(BLACK, 0.72f));
+                DrawCenteredText("Syncing...", gameWidth, gameHeight / 2 - 12, 40, RAYWHITE);
+                char bufferText[48];
+                snprintf(bufferText, sizeof(bufferText), "Buffering snapshots (%zu/%zu)",
+                         sim.getMatchSyncBufferCount(), GameConfig::kMinSnapshotsForPlay);
+                DrawCenteredText(bufferText, gameWidth, gameHeight / 2 + 36, 18, LIGHTGRAY);
+            }
 
 #if defined(PLATFORM_WEB)
             if (isPlaying)

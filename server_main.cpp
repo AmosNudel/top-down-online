@@ -118,6 +118,8 @@ static void handleServerPacket(const NetPeerRef &peer, const uint8_t *data, size
                      playerId, gSim.getQueueCount());
             serverLog(readyMsg);
             broadcastLobbySync();
+            if (gSim.getPhase() == MatchPhase::COUNTDOWN)
+                broadcastWorldState();
         }
         else
         {
@@ -312,7 +314,8 @@ int main(int argc, char **argv)
             if (phase != MatchPhase::COUNTDOWN)
                 loggedCountdownTick = false;
 
-            if (phase == MatchPhase::IN_PROGRESS || phase == MatchPhase::RESULTS)
+            if (phase == MatchPhase::IN_PROGRESS || phase == MatchPhase::RESULTS ||
+                phase == MatchPhase::COUNTDOWN)
             {
                 gSim.buildWorldStatePacket(gStatePacket);
                 gServer.broadcast(gStatePacket.data(), gStatePacket.size(), true);

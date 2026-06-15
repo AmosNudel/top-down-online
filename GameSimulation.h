@@ -83,6 +83,8 @@ public:
     void applyJoinAck(int playerId, uint8_t colorIndex, const char *name);
     void resetWorldStateSync();
     float noteSnapshotArrival(uint32_t serverTick);
+    bool isMatchSyncReady() const;
+    std::size_t getMatchSyncBufferCount() const;
     void predictLocalPlayerMovement(int localPlayerId, float dt, const PlayerInput &input);
     void predictLocalThunderCast(int localPlayerId, const PlayerInput &input);
 
@@ -138,6 +140,9 @@ private:
     void startMatch();
     void endMatch();
     void tickMatchFlow(float dt);
+    void prepareMatchForCountdown();
+    void placePlayersAtSpawn();
+    void beginMatchPrewarm();
     void tickGameplay(float dt, int localPlayerId, const PlayerInput &input, bool applyLocalInput);
 
     int allocateColorIndex() const;
@@ -251,6 +256,7 @@ private:
     std::chrono::steady_clock::time_point lastSnapshotArrivalTime{};
     bool hasSnapshotTime{false};
     bool hasSnapshotArrivalTime{false};
+    bool awaitingSpawnSync{false};
 };
 
 #endif // GAME_SIMULATION_H

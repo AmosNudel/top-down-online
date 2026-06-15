@@ -292,6 +292,7 @@ bool GameSimulation::pressReadyForPlayer(int playerId)
     if (!allQueuePlayersReady())
         return true;
 
+    prepareMatchForCountdown();
     countdownRemaining = GameConfig::kReadyCountdownSec;
     phase = MatchPhase::COUNTDOWN;
     statusMessage = "Match starting soon...";
@@ -495,10 +496,8 @@ void GameSimulation::resetMatchState()
     countdownRemaining = 0.f;
 }
 
-void GameSimulation::startMatch()
+void GameSimulation::placePlayersAtSpawn()
 {
-    resetMatchState();
-
     std::vector<int> queueIds;
     for (int i = 0; i < (int)players.size(); i++)
     {
@@ -516,6 +515,7 @@ void GameSimulation::startMatch()
         entry.slot.kills = 0;
         entry.character.reset();
         entry.character.setPlayerColor(kPlayerColors[entry.slot.colorIndex]);
+        entry.character.setAlive(true);
 
         Vector2 offset = SpawnOffsetForIndex(idx, matchPlayerCount);
         entry.character.setWorldPos(Vector2Add(baseSpawnPos, offset));
@@ -529,6 +529,16 @@ void GameSimulation::startMatch()
 
     if (localPlayerId >= 0 && localPlayerId < (int)players.size())
         spectateTargetId = localPlayerId;
+}
+
+void GameSimulation::prepareMatchForCountdown()
+{
+    placePlayersAtSpawn();
+}
+
+void GameSimulation::startMatch()
+{
+    resetMatchState();
 
     matchTimeRemaining = GameConfig::kMatchDurationSec;
     nextEnemySpawnTargetIdx = 0;
@@ -1295,6 +1305,30 @@ void GameSimulation::resetWorldStateSync()
     snapshotBuffer.clear();
     hasSnapshotTime = false;
     hasSnapshotArrivalTime = false;
+    awaitingSpawnSync = false;
+}
+
+void GameSimulation::beginMatchPrewarm()
+{
+    if (!onlineClientMode)
+        return;
+
+    lastWorldStateTick = 0;
+    snapshotBuffer.clear();
+    hasSnapshotTime = false;
+    awaitingSpawnSync = true;
+}
+
+bool GameSimulation::isMatchSyncReady() const
+{
+    if (!onlineClientMode)
+        return true;
+    return snapshotBuffer.size() >= GameConfig::kMinSnapshotsForPlay;
+}
+
+std::size_t GameSimulation::getMatchSyncBufferCount() const
+{
+    return snapshotBuffer.size();
 }
 
 float GameSimulation::noteSnapshotArrival(uint32_t serverTick)
@@ -1742,8 +1776,12 @@ bool GameSimulation::applyLobbySyncPacket(const uint8_t *data, size_t size)
     if (!NetSerialize::parseLobbySync(data, size, header, entries))
         return false;
 
+    const MatchPhase prevPhase = phase;
     phase = static_cast<MatchPhase>(header.phase);
     countdownRemaining = header.countdownRemaining;
+
+    if (onlineClientMode && prevPhase == MatchPhase::QUEUE && phase == MatchPhase::COUNTDOWN)
+        beginMatchPrewarm();
 
     for (const auto &snap : entries)
     {
@@ -1828,10 +1866,14 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
     if (header.mapSeed != 0 && header.mapSeed != mapSeed)
         init(header.mapSeed);
 
+    const MatchPhase prevPhase = phase;
     phase = static_cast<MatchPhase>(header.phase);
     countdownRemaining = header.countdownRemaining;
     matchTimeRemaining = header.matchTimeRemaining;
     resultsTimeRemaining = header.resultsTimeRemaining;
+
+    if (onlineClientMode && prevPhase == MatchPhase::QUEUE && phase == MatchPhase::COUNTDOWN)
+        beginMatchPrewarm();
 
     for (const auto &snap : playerSnaps)
     {
@@ -1847,7 +1889,18 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
 
         if (isLocal)
         {
-            reconcileLocalPlayerPosition(entry.character, serverPos);
+            if (awaitingSpawnSync && entry.slot.inMatch)
+            {
+                entry.character.setWorldPos(serverPos);
+                awaitingSpawnSync = false;
+#if !defined(PLATFORM_WEB)
+                ClientDiagLog("spawn snap pos=(%.0f,%.0f)", serverPos.x, serverPos.y);
+#endif
+            }
+            else
+            {
+                reconcileLocalPlayerPosition(entry.character, serverPos);
+            }
         }
 
         entry.slot.id = snap.id;
