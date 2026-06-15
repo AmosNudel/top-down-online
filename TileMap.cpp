@@ -1,6 +1,5 @@
 #include "TileMap.h"
 #include <raymath.h>
-#include <cstdlib>
 #include <cmath>
 
 namespace
@@ -94,11 +93,11 @@ void TileMap::runCellularAutomata(std::vector<unsigned char> &grid, int fillPerc
     {
         for (int c = 0; c < cols; c++)
         {
-            bool edge = c < border || r < border ||
-                        c >= cols - border || r >= rows - border;
-            unsigned char v = edge ? (borderValue ? 1 : 0)
-                                   : (unsigned char)((rand() % 100) < fillPercent);
-            grid[(size_t)r * cols + c] = v;
+                bool edge = c < border || r < border ||
+                            c >= cols - border || r >= rows - border;
+                unsigned char v = edge ? (borderValue ? 1 : 0)
+                                       : (unsigned char)(GetRandomValue(0, 99) < fillPercent);
+                grid[(size_t)r * cols + c] = v;
         }
     }
 
@@ -145,7 +144,7 @@ void TileMap::runCellularAutomata(std::vector<unsigned char> &grid, int fillPerc
 
 void TileMap::generate(unsigned int seed)
 {
-    srand(seed);
+    SetRandomSeed(seed);
     // water lakes: ringed border, ~45% interior fill
     runCellularAutomata(water, 45, 4, /*borderValue=*/true);
     // drop disconnected islands so all land is one reachable mass

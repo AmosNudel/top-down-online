@@ -144,8 +144,11 @@ void GameSimulation::init(unsigned int seed)
         placeProp(logTexture);
     }
 
-    phase = MatchPhase::IDLE;
-    statusMessage.clear();
+    if (!onlineClientMode)
+    {
+        phase = MatchPhase::IDLE;
+        statusMessage.clear();
+    }
 }
 
 JoinResult GameSimulation::tryJoinQueue(const char *name, bool isServer, int *outPlayerId)
@@ -838,7 +841,7 @@ void GameSimulation::updateEnemyCameraAnchors()
     }
 }
 
-void GameSimulation::resolvePlayerMovement(Character &player, float dt, const PlayerInput &input)
+void GameSimulation::resolvePlayerMovement(Character &player, float dt, const PlayerInput &input, bool checkCollision)
 {
     (void)dt;
     player.setVirtualInput(input.move, input.attackPressed, input.attackHeld);
@@ -847,6 +850,9 @@ void GameSimulation::resolvePlayerMovement(Character &player, float dt, const Pl
     else if (input.move.x > 0.01f)
         player.setFacingDirection(1.f);
     player.tick(dt, true, false, false);
+
+    if (!checkCollision)
+        return;
 
     if (player.getWorldPos().x < 0.f ||
         player.getWorldPos().y < 0.f ||
@@ -1399,7 +1405,7 @@ void GameSimulation::predictLocalPlayerMovement(int localPlayerId, float dt, con
     if (!local || !local->getAlive())
         return;
 
-    resolvePlayerMovement(*local, dt, input);
+    resolvePlayerMovement(*local, dt, input, false);
 }
 
 void GameSimulation::predictLocalThunderCast(int localPlayerId, const PlayerInput &input)
@@ -1606,6 +1612,18 @@ void GameSimulation::tickInterpolation()
         Vector2 fromPos = fromIt != fromSnap->enemyPos.end() ? fromIt->second : toIt->second;
         Vector2 toPos = toIt != toSnap->enemyPos.end() ? toIt->second : fromPos;
         Vector2 pos = lerpPos(fromPos, toPos, t);
+
+        if (localPlayerId >= 0)
+        {
+            const Character *local = getPlayerCharacter(localPlayerId);
+            if (local && local->getAlive())
+            {
+                const float nearDist = Vector2Distance(pos, local->getWorldCenter());
+                if (nearDist < GameConfig::kEnemyNearSnapDist)
+                    pos = toPos;
+            }
+        }
+
         enemy.setWorldPosInterpolated(pos);
         updateFacingFromMotion(enemy, Vector2Subtract(toPos, fromPos));
     }
@@ -1864,7 +1882,12 @@ bool GameSimulation::applyWorldStatePacket(const uint8_t *data, size_t size)
     lastWorldStateTick = header.tick;
 
     if (header.mapSeed != 0 && header.mapSeed != mapSeed)
+    {
         init(header.mapSeed);
+#if !defined(PLATFORM_WEB)
+        ClientDiagLog("map loaded seed=%u", header.mapSeed);
+#endif
+    }
 
     const MatchPhase prevPhase = phase;
     phase = static_cast<MatchPhase>(header.phase);

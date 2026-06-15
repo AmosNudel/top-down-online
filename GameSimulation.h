@@ -149,7 +149,7 @@ private:
     Vector2 spawnWorldPosForCharacter(const Character &character) const;
     Vector2 playerWorldCenter(const Character &character) const;
 
-    void resolvePlayerMovement(Character &player, float dt, const PlayerInput &input);
+    void resolvePlayerMovement(Character &player, float dt, const PlayerInput &input, bool checkCollision = true);
     void tickPickupSpawns(float dt);
     void tickPickups(float dt, Character &player);
     bool allQueuePlayersReady() const;
